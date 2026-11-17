@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {generateCatalog} from '../dist/generation.mjs';
+import {createOrbitSystem,angularSpeed} from '../dist/orbits.mjs';
+const stars=[{position:[-380,230,-950],radius:8},{position:[850,90,200],radius:10},{position:[-650,-100,450],radius:7}];
+const distance=(a,b)=>Math.hypot(...a.map((x,i)=>x-b[i]));
+test('every orbit has an existing heavier host of the right type',()=>{const o=createOrbitSystem(generateCatalog(2402),stars);for(const n of o.nodes){if(!n.parent){assert.equal(n.type,'black-hole');continue;}const p=o.byId.get(n.parent);assert.ok(p);assert.ok(p.mu>n.mu,`${n.id} must orbit a heavier object`);assert.equal(p.type,n.type==='star'?'black-hole':n.type==='planet'?'star':'planet');}});
+test('initial seeded positions are preserved and paths remain centered on moving hosts',()=>{const bodies=generateCatalog(17),o=createOrbitSystem(bodies,stars);o.update(0);for(const b of bodies)assert.ok(distance(o.byId.get(b.name).position,b.position)<1e-8);for(const t of [1,10,30,60]){o.update(t);for(const n of o.nodes){assert.ok(n.position.every(Number.isFinite));if(n.parent)assert.ok(Math.abs(distance(n.position,o.byId.get(n.parent).position)-n.radius)<1e-7);}}});
+test('worlds move and orbital positions are independent of frame rate',()=>{const a=createOrbitSystem(generateCatalog(9),stars),b=createOrbitSystem(generateCatalog(9),stars);const start=[...a.byId.get('Aurelia').position];for(let t=0;t<=60;t++)a.update(t);b.update(60);assert.deepEqual(a.nodes.map(n=>n.position),b.nodes.map(n=>n.position));assert.ok(distance(start,a.byId.get('Aurelia').position)>10);});
+test('larger orbital radii move more slowly under the same mass',()=>{assert.ok(angularSpeed(1000,100)>angularSpeed(1000,200));assert.ok(angularSpeed(2000,100)>angularSpeed(1000,100));});
+test('rendered orbits move between simulation ticks without changing host radius',()=>{const o=createOrbitSystem(generateCatalog(9),stars);o.update(.06);const n=o.byId.get('Aurelia'),first=[...n.renderPosition];o.update(.07);assert.ok(distance(first,n.renderPosition)>0);assert.ok(Math.abs(distance(n.renderPosition,o.byId.get(n.parent).renderPosition)-n.radius)<1e-7);});
