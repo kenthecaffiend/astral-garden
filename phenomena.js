@@ -1,0 +1,25 @@
+import * as T from './vendor/three.module.js';
+import {rng} from './generation.mjs';
+import {rockGeometry,rockMaterial} from './rocks.js';
+export function createPhenomena(parent,suns,horizon,glow,seed){
+ const random=rng(seed^0x1cead),binary=suns[10],pulsar=suns[9];
+ const pair=[new T.Color(1,.43,.14),new T.Color(.33,.66,1)].map((color,i)=>{const m=new T.Mesh(new T.SphereGeometry(i?8:11,48,32),suns[0].material.clone());m.material.uniforms.color.value.copy(color);const halo=new T.Sprite(new T.SpriteMaterial({map:glow,color,blending:T.AdditiveBlending,depthWrite:false,opacity:.8}));halo.scale.setScalar(i?110:145);m.add(halo);parent.add(m);return {mesh:m,position:m.position,radius:i?8:11,color};});
+ // Two stars share a barycentre carried by the massive orbit node.
+ binary.material.colorWrite=false;binary.material.depthWrite=false;binary.userData.corona.visible=false;
+ pulsar.material.uniforms.color.value.setRGB(.55,.8,1.);pulsar.userData.corona.material.color.setRGB(.4,.7,1.);
+ const beamGroup=new T.Group();pulsar.add(beamGroup);beamGroup.rotation.z=.55;
+ const beamMaterial=new T.ShaderMaterial({transparent:true,depthWrite:false,side:T.DoubleSide,blending:T.AdditiveBlending,uniforms:{time:{value:0}},vertexShader:'varying vec2 vUv;varying vec3 vN;varying vec3 vW;void main(){vUv=uv;vN=mat3(modelMatrix)*normal;vW=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',fragmentShader:'varying vec2 vUv;varying vec3 vN;varying vec3 vW;uniform float time;void main(){float facing=abs(dot(normalize(vN),normalize(cameraPosition-vW)));float a=pow(clamp(1.-vUv.y,0.,1.),1.7)*.07*pow(facing,2.);gl_FragColor=vec4(vec3(.2,.6,1.8)*(1.+.18*sin(time*3.)),a);}'});
+ for(const sign of [-1,1]){const beam=new T.Mesh(new T.CylinderGeometry(6,.08,65,48,1,true),beamMaterial);beam.position.y=sign*32.5;beam.rotation.z=sign<0?Math.PI:0;beamGroup.add(beam);}
+ // Irregular fragments retain an orbital centre: the massive Shallows core.
+ const fragments=new T.InstancedMesh(rockGeometry(5),rockMaterial(0x35302d),240);parent.add(fragments);const fragmentData=Array.from({length:240},()=>({angle:random()*Math.PI*2,radius:23+random()*27,size:.3+random()*2.7,tilt:(random()-.5)*.6,phase:random()*6.28}));const dummy=new T.Object3D();let shatteredHost=null;
+ // A repeatable tidal encounter: a nucleus stretches, then separates into debris.
+ const stream=new T.Group();horizon.add(stream);const streamParts=[];
+ for(let i=0;i<80;i++){const sprite=new T.Sprite(new T.SpriteMaterial({map:glow,color:i<12?0xc7edff:0xf6b66a,blending:T.AdditiveBlending,depthWrite:false,opacity:0}));sprite.scale.setScalar(i<12?2.5:1.2);stream.add(sprite);streamParts.push(sprite);}
+ const landmarks=[{name:'The Twins',type:'BINARY STARS',description:'Amber and blue suns, circling their shared centre of mass.',position:()=>binary.position,offset:new T.Vector3(0,55,180)}, {name:'Lighthouse',type:'PULSAR',description:'A rotating neutron star sweeps twin beams through the dark.',position:()=>pulsar.position,offset:new T.Vector3(0,30,170)}, {name:'The Broken Moon',type:'TIDAL REMNANT',description:'A fractured world, surrounded by orbiting fragments.',position:()=>shatteredHost?.position||new T.Vector3(-350,-35,400),offset:new T.Vector3(0,25,100)}, {name:'The Last Passage',type:'TIDAL DISRUPTION',description:'A comet stretches into a stream of glowing debris.',position:()=>horizon.position,offset:new T.Vector3(20,85,230)}];
+ return {landmarks,setShatteredHost(mesh){shatteredHost=mesh;},lightSources(s){return [...s.filter(m=>!m.userData.binary).map(m=>({position:m.position,radius:m.scale.x,color:m.material.uniforms.color.value})),...pair];},update(time){
+  for(const s of pair)s.mesh.material.uniforms.time.value=time;const a=time*.07;pair[0].mesh.position.copy(binary.position).add(new T.Vector3(Math.cos(a)*19,Math.sin(a)*6,Math.sin(a)*19));pair[1].mesh.position.copy(binary.position).add(new T.Vector3(-Math.cos(a)*32,-Math.sin(a)*10,-Math.sin(a)*32));
+  beamGroup.rotation.y=time*.55;beamMaterial.uniforms.time.value=time;pulsar.userData.corona.material.opacity=.55+.25*Math.pow(.5+.5*Math.sin(time*2.2),4.);
+  if(shatteredHost){for(let i=0;i<fragmentData.length;i++){const f=fragmentData[i],a=f.angle+time*Math.sqrt(14/f.radius**3);dummy.position.copy(shatteredHost.position).add(new T.Vector3(Math.cos(a)*f.radius,Math.sin(a)*f.radius*Math.sin(f.tilt),Math.sin(a)*f.radius*Math.cos(f.tilt)));dummy.rotation.set(f.phase+time*.05,f.phase+time*.03,f.tilt);dummy.scale.set(f.size,f.size*.55,f.size*.8);dummy.updateMatrix();fragments.setMatrixAt(i,dummy.matrix);}fragments.instanceMatrix.needsUpdate=true;fragments.computeBoundingSphere();}
+  const cycle=time%38;for(let i=0;i<streamParts.length;i++){const age=cycle-i*.11;const s=streamParts[i];const progress=Math.max(0,Math.min(1,age/27));const r=260*(1-progress)+22;const a=-1.2+progress*3.8+i*.006*progress;const scatter=Math.max(0,progress-.4);s.position.set(Math.cos(a)*r,(1-progress)*30+Math.sin(i*9.3)*scatter*8,Math.sin(a)*r);s.material.opacity=age>0&&age<27?Math.sin(Math.PI*progress)*.85:0;}
+ }};
+}
