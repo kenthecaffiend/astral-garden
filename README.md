@@ -2,7 +2,9 @@
 
 A crowded, cinematic space playground with procedural planets, orbiting moons, asteroids, multicoloured nebulae, comets, black holes, satellites and occasional UFOs.
 
-**[Play Astral Garden](https://astral-garden-drift.strato-creat-6867.chatgpt.site)** — public, no login required.
+**[Play Astral Garden on GitHub Pages](https://kenthecaffiend.github.io/astral-garden/)** — public, no login required.
+
+[Alternate playable mirror](https://astral-garden-drift.strato-creat-6867.chatgpt.site)
 
 ## About this fork
 
@@ -38,3 +40,16 @@ node --test tests/*.test.mjs
 - Three.js: vendored with its [MIT licence](astral-garden/dist/vendor/THREE-LICENSE.txt).
 
 The scene is artistic and procedural; orbital motion and black-hole lensing are cinematic approximations.
+
+## Publishing updates to GitHub Pages
+
+GitHub Pages serves the `gh-pages` branch, which contains only the space edition's static files. After committing changes on `main`, publish them with:
+
+```sh
+git push origin main
+git subtree split --prefix=astral-garden/dist -b pages-release
+git push origin pages-release:gh-pages
+git branch -d pages-release
+```
+
+GitHub automatically deploys updates pushed to `gh-pages`. The upstream underwater edition remains in the main branch.
